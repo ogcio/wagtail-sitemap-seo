@@ -15,7 +15,7 @@ def register_admin_urls():
     ]
 
 
-@hooks.register("register_admin_menu_item")
+@hooks.register("register_settings_menu_item")
 def register_admin_menu_item():
     return MenuItem(
         "Build sitemaps",
