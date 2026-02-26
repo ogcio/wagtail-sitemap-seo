@@ -14,15 +14,15 @@ from wagtail.admin.auth import permission_required
 @require_http_methods(["GET", "POST"])
 def build_sitemaps_admin_view(request):
     if request.method == "POST":
-        #try:
-        call_command("build_sitemaps")
-        #messages.success(request, f"Sitemaps generated successfully.")
-        #except Exception as e:
-        #    print(e)
-        #    print(e)
-        #    print(e)
-        #    messages.error(request, f"Failed to generate sitemaps: {e!s}")
+        try:
+            call_command("build_sitemaps")
+            messages.success(request, f"Sitemaps generated successfully.")
+        except Exception as e:
+            print(e)
+            print(e)
+            print(e)
+            messages.error(request, f"Failed to generate sitemaps: {e!s}")
 
-        # return redirect(reverse("wagtailadmin_home"))
+        return redirect(reverse("wagtailadmin_home"))
 
     return render(request, "wagtail_sitemap_seo/build_sitemaps_confirm.html")
