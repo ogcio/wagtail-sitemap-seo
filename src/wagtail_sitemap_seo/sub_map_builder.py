@@ -47,7 +47,10 @@ class MapBuilder(RootBuilder):
 
         # TODO: perhaps load path from settings?
 
-        loc_elem.text = 'https://' + self.get_site() + '/sitemap/map_{}.xml'.format(url.title.replace(' ', '').lower())
+        loc_elem.text = '{}/sitemap/map_{}.xml'.format(
+            self.get_site(),
+            url.title.replace(' ', '').lower()
+        )
         published_elem.text = self._format_date(datetime.today())
 
         sitemap_elem.append(loc_elem)

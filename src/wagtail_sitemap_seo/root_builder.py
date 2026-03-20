@@ -37,7 +37,7 @@ class RootBuilder(BaseBuilder):
 
         # Avoid DB access at import time; resolve Site here instead.
         self._site_obj = Site.objects.get(is_default_site=True)
-        self.site = self._site_obj.site_name or self._site_obj.hostname
+        self.site = self._site_obj.root_url.rstrip("/")
 
         # small caches to avoid repetitive DB hits
         self._locale_cache: dict[str, Locale] = {}
@@ -48,13 +48,13 @@ class RootBuilder(BaseBuilder):
     # -----------------------------
     def site_map_init(self, root: bool = False):
         xml_root = ET.Element("urlset")
-        xml_root.attrib["xmlns:xsi"] = "https://www.w3.org/2001/XMLSchema-instance"
-        xml_root.attrib["xmlns:xhtml"] = "https://www.w3.org/1999/xhtml"
+        xml_root.attrib["xmlns:xsi"] = "http://www.w3.org/2001/XMLSchema-instance"
+        xml_root.attrib["xmlns:xhtml"] = "http://www.w3.org/1999/xhtml"
         xml_root.attrib["xsi:schemaLocation"] = (
-            "https://www.sitemaps.org/schemas/sitemap/0.9"
-            + " https://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
+            "http://www.sitemaps.org/schemas/sitemap/0.9"
+            + " http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"
         )
-        xml_root.attrib["xmlns"] = "https://www.sitemaps.org/schemas/sitemap/0.9"
+        xml_root.attrib["xmlns"] = "http://www.sitemaps.org/schemas/sitemap/0.9"
         return xml_root
 
     def add_xml_root(self, xml_root):
