@@ -1,17 +1,16 @@
 from django.core.files.base import ContentFile
 
-from .storage import SitemapS3Storage
-
 
 def save_xml(name: str, content: bytes) -> str:
     """
-    Save an XML file using Django's default storage.
+    Save an XML file to S3 using SitemapS3Storage.
 
-    - In dev (SITEMAP_WRITE_S3): saves to MEDIA_ROOT
-    - In ECS/UAT (SITEMAP_WRITE_S3=True): saves to S3 bucket root (because your default storage is S3Boto3Storage)
+    Requires the [s3] extra: pip install wagtail-sitemap-seo[s3]
 
     Returns the final storage path.
     """
+    from .storage import SitemapS3Storage  # lazy: only imported when S3 is actually used
+
     storage = SitemapS3Storage()
     if storage.exists(name):
         storage.delete(name)

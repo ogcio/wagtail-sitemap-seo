@@ -8,8 +8,6 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from wagtail.models import Locale
-
 from wagtail_sitemap_seo.sub_map_builder import MapBuilder
 
 
@@ -21,11 +19,6 @@ class Command(BaseCommand):
             "--output-dir",
             default=".",
             help="Directory to write XML files into (default: current working directory).",
-        )
-        parser.add_argument(
-            "--locale",
-            default="en",
-            help="Wagtail locale code to generate maps for (default: en).",
         )
         parser.add_argument(
             "--root-file",
@@ -43,28 +36,13 @@ class Command(BaseCommand):
         output_dir = Path(options["output_dir"]).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        locale_code = options["locale"]
-        try:
-            locale = Locale.objects.get(language_code=locale_code)
-        except Locale.DoesNotExist as e:
-            raise CommandError(f"Locale '{locale_code}' does not exist in wagtailcore_locale.") from e
-
         old_cwd = Path.cwd()
         os.chdir(output_dir)
 
         try:
             builder = MapBuilder(options["root_file"])
             builder._load_urls_from_root()
-            xml_root = builder.site_map_init()
-            builder.add_xml_root(xml_root)
-
-            if locale_code != "en":
-                self.stdout.write(
-                    self.style.WARNING(
-                        "Your current MapBuilder.build_map() hardcodes locale 'en'. "
-                        "Generating per-page maps for non-en may be incorrect until you update MapBuilder."
-                    )
-                )
+            builder.add_xml_root()
 
             for page in builder.root_pages:
                 builder.build_map(page)

@@ -57,19 +57,15 @@ class RootBuilder(BaseBuilder):
         xml_root.attrib["xmlns"] = "http://www.sitemaps.org/schemas/sitemap/0.9"
         return xml_root
 
-    def add_xml_root(self, xml_root):
+    def add_xml_root(self):
         sitemap_index = ET.Element("sitemapindex")
         sitemap_index.attrib["xmlns"] = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
         for page in self.root_pages:
-            # IMPORTANT: BaseBuilder.build_root_elem should not rely on page.get_url()
-            # outside a request. Prefer:
-            #   page.relative_url(self._site_obj)  OR  page.get_full_url(site=self._site_obj)
             elem = self.build_root_elem(page)
             sitemap_index.append(elem)
 
-        xml_root.append(sitemap_index)
-        tree = ET.ElementTree(xml_root)
+        tree = ET.ElementTree(sitemap_index)
 
         out_name = "root_map.xml"
         if getattr(settings, "SITEMAP_DIR", None):

@@ -15,9 +15,23 @@ dependencies = [
   "wagtail>=5.2",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-django",
+]
+s3 = [
+  "django-storages[s3]",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["src", "."]
+testpaths = ["tests"]
