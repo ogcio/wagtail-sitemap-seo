@@ -48,6 +48,8 @@ TEMPLATES = [
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+ROOT_URLCONF = "wagtail.urls"
+
 STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = "/tmp/wagtail_sitemap_seo_test_media/"
