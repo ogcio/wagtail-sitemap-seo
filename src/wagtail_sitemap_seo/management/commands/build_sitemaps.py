@@ -55,8 +55,7 @@ class Command(BaseCommand):
         try:
             builder = MapBuilder(options["root_file"])
             builder._load_urls_from_root()
-            xml_root = builder.site_map_init()
-            builder.add_xml_root(xml_root)
+            builder.add_xml_root()
 
             if locale_code != "en":
                 self.stdout.write(
