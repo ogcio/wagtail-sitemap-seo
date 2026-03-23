@@ -8,6 +8,7 @@ Includes a regression test for Issue 2:
 
 import os
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -163,3 +164,115 @@ class TestBuildRootElem:
 
         loc = elem.find("loc")
         assert "map_mysection.xml" in loc.text
+
+
+# ---------------------------------------------------------------------------
+# Issue 6 regression: lastmod must use real page dates, not datetime.today()
+# ---------------------------------------------------------------------------
+
+class TestLatestLastmod:
+
+    def test_returns_most_recent_last_published_at(self):
+        builder = _bare_map_builder()
+        page = MagicMock()
+
+        d1 = datetime(2024, 1, 10, tzinfo=timezone.utc)
+        d2 = datetime(2024, 6, 15, tzinfo=timezone.utc)
+        d3 = datetime(2023, 11, 1, tzinfo=timezone.utc)
+
+        (page.get_descendants.return_value
+             .live.return_value
+             .order_by.return_value
+             .values_list.return_value
+             .first.return_value) = d2
+
+        result = builder._latest_lastmod(page)
+        assert result == d2
+
+    def test_returns_none_when_no_pages_published(self):
+        builder = _bare_map_builder()
+        page = MagicMock()
+
+        (page.get_descendants.return_value
+             .live.return_value
+             .order_by.return_value
+             .values_list.return_value
+             .first.return_value) = None
+
+        result = builder._latest_lastmod(page)
+        assert result is None
+
+    def test_orders_by_last_published_at_descending(self):
+        builder = _bare_map_builder()
+        page = MagicMock()
+
+        qs = (page.get_descendants.return_value
+                  .live.return_value
+                  .order_by.return_value)
+        qs.values_list.return_value.first.return_value = None
+
+        builder._latest_lastmod(page)
+
+        page.get_descendants.return_value.live.return_value.order_by.assert_called_once_with(
+            "-last_published_at"
+        )
+
+
+class TestBuildRootElemLastmod:
+
+    def test_lastmod_uses_actual_page_date_not_today(self):
+        """
+        Regression test for Issue 6.
+        build_root_elem must not use datetime.today() — it must use the most
+        recent last_published_at from the page's descendants.
+        """
+        builder = _bare_map_builder()
+        page = _mock_page("Home")
+
+        real_date = datetime(2024, 3, 20, tzinfo=timezone.utc)
+        builder._latest_lastmod = MagicMock(return_value=real_date)
+
+        elem = builder.build_root_elem(page)
+
+        lastmod = elem.find("lastmod")
+        assert lastmod.text == "2024-03-20", (
+            "lastmod must reflect the page's actual last_published_at, not today's date"
+        )
+
+    def test_lastmod_is_none_when_no_published_date(self):
+        builder = _bare_map_builder()
+        page = _mock_page("Home")
+
+        builder._latest_lastmod = MagicMock(return_value=None)
+        elem = builder.build_root_elem(page)
+
+        lastmod = elem.find("lastmod")
+        assert lastmod.text is None
+
+    def test_build_root_elem_calls_latest_lastmod(self):
+        builder = _bare_map_builder()
+        page = _mock_page("Home")
+
+        builder._latest_lastmod = MagicMock(return_value=None)
+        builder.build_root_elem(page)
+
+        builder._latest_lastmod.assert_called_once_with(page)
+
+    def test_lastmod_does_not_equal_todays_date_by_default(self):
+        """
+        Ensure the old datetime.today() fallback is gone.
+        If _latest_lastmod returns None, lastmod text must be None — not today.
+        """
+        from datetime import date
+
+        builder = _bare_map_builder()
+        page = _mock_page("Home")
+        builder._latest_lastmod = MagicMock(return_value=None)
+
+        elem = builder.build_root_elem(page)
+        lastmod = elem.find("lastmod")
+
+        today_str = date.today().strftime("%Y-%m-%d")
+        assert lastmod.text != today_str, (
+            "lastmod must not fall back to today's date — use actual page publish date"
+        )
