@@ -3,7 +3,6 @@ from io import BytesIO
 
 import xml.etree.cElementTree as ET
 from django.conf import settings
-from wagtail.models import Locale
 
 from .root_builder import RootBuilder
 from .s3_helper import save_xml
@@ -17,7 +16,10 @@ class MapBuilder(RootBuilder):
         super().__init__(root_file)
 
     def build_map(self, page):
-        locale = Locale.objects.get(language_code='en')
+        # Use the locale of the page being mapped rather than hardcoding 'en'.
+        # This ensures Irish (/ga/), English (/en/), and any other locale
+        # sections each get their own correct descendant pages.
+        locale = page.locale
         pages = page.get_descendants(inclusive=True).live().filter(locale=locale)
 
         new_map = self.site_map_init()

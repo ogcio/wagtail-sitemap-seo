@@ -57,7 +57,6 @@ class TestSitemapWriteS3Setting:
         If SITEMAP_WRITE_S3 is not defined in settings, build_map() must not
         raise AttributeError. It should fall back to local file writing.
         """
-        # Remove the setting to simulate it being absent
         if hasattr(settings, "SITEMAP_WRITE_S3"):
             delattr(settings, "SITEMAP_WRITE_S3")
 
@@ -67,16 +66,13 @@ class TestSitemapWriteS3Setting:
         old = os.getcwd()
         os.chdir(tmp_path)
         try:
-            with patch("wagtail_sitemap_seo.sub_map_builder.Locale") as MockLocale:
-                MockLocale.objects.get.return_value = MagicMock()
-                # Must not raise AttributeError
-                try:
-                    builder.build_map(page)
-                except AttributeError as exc:
-                    pytest.fail(
-                        f"build_map() raised AttributeError when SITEMAP_WRITE_S3 "
-                        f"was absent from settings: {exc}"
-                    )
+            try:
+                builder.build_map(page)
+            except AttributeError as exc:
+                pytest.fail(
+                    f"build_map() raised AttributeError when SITEMAP_WRITE_S3 "
+                    f"was absent from settings: {exc}"
+                )
         finally:
             os.chdir(old)
 
@@ -90,14 +86,38 @@ class TestSitemapWriteS3Setting:
         old = os.getcwd()
         os.chdir(tmp_path)
         try:
-            with patch("wagtail_sitemap_seo.sub_map_builder.Locale") as MockLocale:
-                MockLocale.objects.get.return_value = MagicMock()
-                builder.build_map(page)
+            builder.build_map(page)
         finally:
             os.chdir(old)
 
         assert (tmp_path / "map_about.xml").exists(), (
             "build_map() should write map_<title>.xml locally when SITEMAP_WRITE_S3=False"
+        )
+
+    def test_build_map_uses_page_locale_not_hardcoded_en(self, tmp_path, settings):
+        """
+        Regression test for Issue 7.
+        build_map() must filter descendants by page.locale, not by a hardcoded 'en' locale.
+        """
+        settings.SITEMAP_WRITE_S3 = False
+        settings.SITEMAP_DIR = None
+
+        builder = _bare_map_builder()
+        page = _mock_page("Gaeilge")
+
+        ga_locale = MagicMock()
+        ga_locale.language_code = "ga"
+        page.locale = ga_locale
+
+        old = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            builder.build_map(page)
+        finally:
+            os.chdir(old)
+
+        page.get_descendants.return_value.live.return_value.filter.assert_called_once_with(
+            locale=ga_locale
         )
 
     def test_local_map_file_contains_urlset_root(self, tmp_path, settings):
@@ -110,9 +130,7 @@ class TestSitemapWriteS3Setting:
         old = os.getcwd()
         os.chdir(tmp_path)
         try:
-            with patch("wagtail_sitemap_seo.sub_map_builder.Locale") as MockLocale:
-                MockLocale.objects.get.return_value = MagicMock()
-                builder.build_map(page)
+            builder.build_map(page)
         finally:
             os.chdir(old)
 
