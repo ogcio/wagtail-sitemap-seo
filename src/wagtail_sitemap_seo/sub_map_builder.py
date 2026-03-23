@@ -1,4 +1,6 @@
 import logging
+import re
+import unicodedata
 from io import BytesIO
 
 import xml.etree.cElementTree as ET
@@ -8,6 +10,30 @@ from .root_builder import RootBuilder
 from .s3_helper import save_xml
 
 logger = logging.getLogger(__name__)
+
+
+def _page_slug(title: str) -> str:
+    """
+    Convert a page title to a safe, ASCII-only, URL/filename slug.
+
+    Steps:
+      1. NFKD-normalise: decompose accented chars (é -> e + combining acute)
+      2. Encode to ASCII ignoring combining marks (drops the accent bytes)
+      3. Lowercase
+      4. Replace any run of non-alphanumeric characters with a single hyphen
+      5. Strip leading/trailing hyphens
+
+    Examples:
+      "Overseas Travel | Travel Wise"  -> "overseas-travel-travel-wise"
+      "Éire ag Comhthionól Ginearálta" -> "eire-ag-comhthionol-ginearlta"
+      "Irish Aid"                      -> "irish-aid"
+      "EU50"                           -> "eu50"
+    """
+    normalised = unicodedata.normalize("NFKD", title)
+    ascii_bytes = normalised.encode("ascii", "ignore")
+    ascii_str = ascii_bytes.decode("ascii").lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_str)
+    return slug.strip("-")
 
 
 class MapBuilder(RootBuilder):
@@ -26,7 +52,8 @@ class MapBuilder(RootBuilder):
         for p in pages:
             elem = self.build_url_elem(p)
             new_map.append(elem)
-        title = page.title.replace(' ', '').lower()
+
+        slug = _page_slug(page.title)
         tree = ET.ElementTree(new_map)
 
         if getattr(settings, "SITEMAP_WRITE_S3", False):
@@ -34,12 +61,12 @@ class MapBuilder(RootBuilder):
             tree.write(buffer, encoding='utf-8', xml_declaration=True)
             content = buffer.getvalue()
             if getattr(settings, "SITEMAP_DIR", None):
-                save_xml('{}/map_{}.xml'.format(settings.SITEMAP_DIR, title), content)
+                save_xml('{}/map_{}.xml'.format(settings.SITEMAP_DIR, slug), content)
             else:
-                save_xml('map_{}.xml'.format(title), content)
+                save_xml('map_{}.xml'.format(slug), content)
         else:
-            tree.write('map_{}.xml'.format(title), encoding='utf-8', xml_declaration=True)
-            logger.info("[sitemap] Wrote map_%s.xml locally", title)
+            tree.write('map_{}.xml'.format(slug), encoding='utf-8', xml_declaration=True)
+            logger.info("[sitemap] Wrote map_%s.xml locally", slug)
 
     def _latest_lastmod(self, page):
         """
@@ -62,7 +89,7 @@ class MapBuilder(RootBuilder):
 
         loc_elem.text = '{}/sitemap/map_{}.xml'.format(
             self.get_site(),
-            url.title.replace(' ', '').lower()
+            _page_slug(url.title)
         )
 
         lastmod = self._latest_lastmod(url)

@@ -1,9 +1,10 @@
 """
-Tests for MapBuilder (sub_map_builder).
+Tests for MapBuilder (sub_map_builder) and the _page_slug helper.
 
-Includes a regression test for Issue 2:
-  settings.SITEMAP_WRITE_S3 must not raise AttributeError when the setting
-  is absent from Django settings.
+Includes regression tests for:
+  Issue 2: SITEMAP_WRITE_S3 must not raise AttributeError when absent
+  Issue 7: locale derived from page, not hardcoded 'en'
+  Issue 8: filenames are ASCII-safe slugs (pipe, accents, spaces all handled)
 """
 
 import os
@@ -43,6 +44,83 @@ def _mock_page(title="Home"):
     page.get_translations.return_value = []
     page.get_descendants.return_value.live.return_value.filter.return_value = []
     return page
+
+
+# ---------------------------------------------------------------------------
+# Issue 8: _page_slug — safe ASCII slug generation
+# ---------------------------------------------------------------------------
+
+class TestPageSlug:
+
+    def _slug(self, title):
+        from wagtail_sitemap_seo.sub_map_builder import _page_slug
+        return _page_slug(title)
+
+    def test_simple_title_lowercased(self):
+        assert self._slug("Irish Aid") == "irish-aid"
+
+    def test_spaces_become_hyphens(self):
+        assert self._slug("Visit Ireland") == "visit-ireland"
+
+    def test_pipe_character_becomes_hyphen(self):
+        # Regression: "Overseas Travel | Travel Wise" used to produce
+        # "overseastravel|travelwise" which broke the proxy URL regex.
+        assert self._slug("Overseas Travel | Travel Wise") == "overseas-travel-travel-wise"
+
+    def test_accented_characters_are_ascii_normalised(self):
+        # Regression: Irish titles with é, ó, á used to produce filenames
+        # with non-ASCII bytes that break some S3 / CDN configurations.
+        result = self._slug("Éire ag Comhthionól Ginearálta na nA")
+        assert result.isascii(), f"Expected ASCII-only slug, got: {result!r}"
+
+    def test_accented_e_dropped_correctly(self):
+        assert self._slug("Éire") == "eire"
+
+    def test_multiple_special_chars_collapsed_to_single_hyphen(self):
+        assert self._slug("EU 50 & Beyond!") == "eu-50-beyond"
+
+    def test_leading_trailing_hyphens_stripped(self):
+        assert not self._slug("---Home---").startswith("-")
+        assert not self._slug("---Home---").endswith("-")
+
+    def test_alphanumeric_only_title_unchanged(self):
+        assert self._slug("EU50") == "eu50"
+
+    def test_empty_title_returns_empty_string(self):
+        assert self._slug("") == ""
+
+    def test_only_special_chars_returns_empty(self):
+        assert self._slug("| & !") == ""
+
+    def test_real_world_pipe_title(self):
+        slug = self._slug("Overseas Travel | Travel Wise")
+        assert "|" not in slug
+        assert slug.isascii()
+
+    def test_real_world_irish_title(self):
+        slug = self._slug("Éire ag Comhthionól Ginearálta na nA")
+        assert slug.isascii()
+        assert "|" not in slug
+        assert " " not in slug
+
+    def test_slug_matches_proxy_url_regex(self):
+        """Slugs must match the proxy view URL pattern [-\\w]+."""
+        import re
+        pattern = re.compile(r"^[-\w]+$")
+        titles = [
+            "Overseas Travel | Travel Wise",
+            "Éire ag Comhthionól Ginearálta",
+            "Irish Aid",
+            "Department of Foreign Affairs and Trade",
+            "EU50",
+            "Ireland at the UN",
+        ]
+        for title in titles:
+            slug = self._slug(title)
+            if slug:  # empty slug has no filename to match
+                assert pattern.match(slug), (
+                    f"Slug {slug!r} (from {title!r}) does not match proxy URL regex [-\\w]+"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -174,14 +252,35 @@ class TestBuildRootElem:
         lastmod = elem.find("lastmod")
         assert lastmod is not None
 
-    def test_loc_uses_page_title_slug(self):
+    def test_loc_uses_hyphenated_slug(self):
         builder = _bare_map_builder()
         page = _mock_page("My Section")
 
         elem = builder.build_root_elem(page)
 
         loc = elem.find("loc")
-        assert "map_mysection.xml" in loc.text
+        assert "map_my-section.xml" in loc.text
+
+    def test_loc_slug_sanitises_pipe_character(self):
+        """Regression: pipe in title must not appear in the <loc> URL."""
+        builder = _bare_map_builder()
+        page = _mock_page("Overseas Travel | Travel Wise")
+
+        elem = builder.build_root_elem(page)
+
+        loc = elem.find("loc")
+        assert "|" not in loc.text
+        assert "overseas-travel-travel-wise" in loc.text
+
+    def test_loc_slug_sanitises_accented_characters(self):
+        """Regression: accented Irish characters must be ASCII-normalised."""
+        builder = _bare_map_builder()
+        page = _mock_page("Éire ag Comhthionól")
+
+        elem = builder.build_root_elem(page)
+
+        loc = elem.find("loc")
+        assert loc.text.isascii(), f"<loc> contains non-ASCII: {loc.text!r}"
 
 
 # ---------------------------------------------------------------------------
