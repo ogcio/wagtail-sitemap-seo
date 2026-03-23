@@ -5,11 +5,20 @@ from datetime import datetime
 class BaseBuilder:
 
     def _format_date(self, date):
+        """
+        Return W3C date format YYYY-MM-DD for <lastmod>, or None if unknown.
+
+        ElementTree requires str | None for .text — never assign a datetime object.
+        """
         if not date:
-            return
+            return None
         if isinstance(date, str):
-            return datetime.strptime(date, '%Y-%m-%d')
-        return date.strftime('%Y-%m-%d')
+            # Normalise to ISO date string (may already be YYYY-MM-DD)
+            parsed = datetime.strptime(date.strip()[:10], "%Y-%m-%d")
+            return parsed.strftime("%Y-%m-%d")
+        if hasattr(date, "strftime"):
+            return date.strftime("%Y-%m-%d")
+        return None
 
     def build_url_elem(self, url):
         url_elem = ET.Element('url')
