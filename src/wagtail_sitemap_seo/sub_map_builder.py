@@ -26,7 +26,7 @@ class MapBuilder(RootBuilder):
         title = page.title.replace(' ', '').lower()
         tree = ET.ElementTree(new_map)
 
-        if settings.SITEMAP_WRITE_S3:
+        if getattr(settings, "SITEMAP_WRITE_S3", False):
 
             buffer = BytesIO()
             tree.write(buffer, encoding='utf-8', xml_declaration=True)
