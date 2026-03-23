@@ -36,12 +36,9 @@ class TestFormatDate:
         dt = datetime(2024, 1, 5)
         assert self.builder._format_date(dt) == "2024-01-05"
 
-    def test_parses_valid_date_string_to_datetime(self):
+    def test_parses_valid_date_string_to_iso_string(self):
         result = self.builder._format_date("2024-06-15")
-        assert isinstance(result, datetime)
-        assert result.year == 2024
-        assert result.month == 6
-        assert result.day == 15
+        assert result == "2024-06-15"
 
     def test_invalid_date_string_raises_value_error(self):
         with pytest.raises(ValueError):
