@@ -53,6 +53,7 @@ class MapBuilder(RootBuilder):
             elem = self.build_url_elem(p)
             new_map.append(elem)
 
+        ET.indent(new_map, space="  ")
         slug = _page_slug(page.title)
         tree = ET.ElementTree(new_map)
 

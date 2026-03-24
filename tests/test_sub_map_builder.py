@@ -212,7 +212,19 @@ class TestSitemapWriteS3Setting:
         finally:
             os.chdir(old)
 
-        root = ET.parse(str(tmp_path / "map_section.xml")).getroot()
+        path = tmp_path / "map_section.xml"
+        raw = path.read_bytes()
+        assert raw.startswith(b"<?xml"), (
+            "Sitemap files must start with an XML declaration, not plain text."
+        )
+        assert b"<urlset" in raw, "Sitemap must have a root <urlset> element."
+        # Non-empty maps use </urlset>; an empty tree may serialize as <urlset ... />.
+        if b"<url>" in raw:
+            assert b"</urlset>" in raw
+        else:
+            assert b"</urlset>" in raw or b"/>" in raw
+
+        root = ET.parse(str(path)).getroot()
         assert "urlset" in root.tag, (
             "Per-section map files must have <urlset> as their root element."
         )

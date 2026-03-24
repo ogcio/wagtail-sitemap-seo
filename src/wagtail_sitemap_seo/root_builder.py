@@ -15,6 +15,9 @@ from .s3_helper import save_xml
 
 logger = logging.getLogger(__name__)
 
+# Stable prefix for hreflang links in serialized XML (avoids ns0: noise in some ET versions).
+ET.register_namespace("xhtml", "http://www.w3.org/1999/xhtml")
+
 
 def email_management_enabled() -> bool:
     return getattr(settings, "WAGTAIL_EMAIL_MANAGEMENT_ENABLED", True)
@@ -65,6 +68,7 @@ class RootBuilder(BaseBuilder):
             elem = self.build_root_elem(page)
             sitemap_index.append(elem)
 
+        ET.indent(sitemap_index, space="  ")
         tree = ET.ElementTree(sitemap_index)
 
         out_name = "root_map.xml"
